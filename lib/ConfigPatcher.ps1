@@ -37,9 +37,7 @@ function Find-KeyInLines {
 
     $escapedKey = [regex]::Escape($Key)
     $pattern = "^\s*${escapedKey}\s*="
-    $currentSection = ''
-    $inTargetSection = [string]::IsNullOrEmpty($Section)
-    $depth = 0  # brace nesting depth within the current section
+    $sectionStack = @()
 
     for ($i = 0; $i -lt $Lines.Count; $i++) {
         $line = $Lines[$i]
@@ -48,23 +46,20 @@ function Find-KeyInLines {
         if ($line -match '^\s*[#/]') { continue }
 
         if ($line -match '^\s*"?([^"{}=#]+)"?\s*\{') {
-            $depth++
-            # Only update section tracking at depth 1 (top-level sections)
-            if ($depth -eq 1) {
-                $currentSection = $Matches[1].Trim()
-                if (-not [string]::IsNullOrEmpty($Section)) {
-                    $inTargetSection = $currentSection -eq $Section
-                }
+            $sectionStack += $Matches[1].Trim()
+        }
+        elseif ($line -match '^\s*\}') {
+            if ($sectionStack.Count -gt 0) {
+                $sectionStack = @($sectionStack | Select-Object -SkipLast 1)
             }
         }
-        elseif ($line -match '^\s*\}' -and -not [string]::IsNullOrEmpty($Section)) {
-            if ($depth -gt 0) { $depth-- }
-            # Only reset section tracking when we close a top-level section
-            if ($depth -eq 0) {
-                $inTargetSection = $false
-                $currentSection = ''
-            }
-        }
+
+        $currentSection = $sectionStack -join '.'
+        $topLevelSection = $sectionStack.Count -gt 0 ? $sectionStack[0] : ''
+        $inTargetSection = [string]::IsNullOrEmpty($Section) -or
+            $currentSection -eq $Section -or
+            ($Section -notmatch '\.' -and $topLevelSection -eq $Section)
+
         if ($inTargetSection -and $line -match $pattern) {
             return $i
         }
