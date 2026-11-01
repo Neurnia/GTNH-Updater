@@ -708,8 +708,9 @@ function Get-WebsiteReleases {
             }
 
             # Parse actual download URLs from the page links for this version
-            # Look for links containing this version string and the Java suffix
-            $versionEscaped = [regex]::Escape($version)
+            # Anchor the version to the filename segment "GT_New_Horizons_<version>_"
+            # so that e.g. "2.9.0" does not accidentally match "2.9.0-beta-1".
+            $versionPattern = 'GT_New_Horizons_' + [regex]::Escape($version) + '_'
             $serverZipUrl = $null
             $serverZipName = $null
             $clientZipUrl = $null
@@ -717,7 +718,7 @@ function Get-WebsiteReleases {
 
             foreach ($link in $response.Links) {
                 $href = $link.href
-                if (-not $href -or $href -notmatch $versionEscaped -or $href -notmatch '\.zip$') { continue }
+                if (-not $href -or $href -notmatch $versionPattern -or $href -notmatch '\.zip$') { continue }
                 if ($href -notmatch $javaSuffix) { continue }
 
                 if ($href -match 'ServerPacks') {
